@@ -1,12 +1,12 @@
 services:
   - type: web
     name: whisper-backend
-    env: python
+    env: node
     buildCommand: |
       apt-get update && apt-get install -y ffmpeg
       pip install --upgrade pip setuptools wheel
       pip install -r requirements.txt
-      npm install --production
+      npm ci
     startCommand: node server.js
     envVars:
       - key: PORT

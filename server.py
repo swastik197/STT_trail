@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import subprocess
 import os
@@ -31,9 +31,16 @@ async def transcribe_audio(audio: UploadFile = File(...)):
     # Save the uploaded file
     temp_path = UPLOAD_DIR / audio.filename
     try:
+        # Check file size
+        file_size = 0
         with open(temp_path, "wb") as buffer:
-            shutil.copyfileobj(audio.file, buffer)
-        print(f"Saved file to: {temp_path}")
+            while chunk := await audio.read(8192):
+                file_size += len(chunk)
+                if file_size > 100 * 1024 * 1024:  # 100MB limit
+                    raise HTTPException(status_code=400, detail="File too large. Maximum size is 100MB")
+                buffer.write(chunk)
+        
+        print(f"Saved file to: {temp_path} (size: {file_size/1024/1024:.2f}MB)")
         
         # Run the transcription script with timeout
         print("Starting transcription...")
@@ -50,22 +57,30 @@ async def transcribe_audio(audio: UploadFile = File(...)):
         print(f"Total processing time: {end_time - start_time:.2f} seconds")
         
         if result.returncode == 0:
-            return {"transcription": result.stdout.strip()}
+            transcription = result.stdout.strip()
+            if not transcription:
+                raise HTTPException(status_code=500, detail="Transcription returned empty result")
+            return {"transcription": transcription}
         else:
-            print(f"Transcription failed: {result.stderr}")
-            return {"error": result.stderr.strip()}
+            error_msg = result.stderr.strip()
+            print(f"Transcription failed: {error_msg}")
+            raise HTTPException(status_code=500, detail=f"Transcription failed: {error_msg}")
             
     except subprocess.TimeoutExpired:
         print("Transcription timed out after 5 minutes")
         if temp_path.exists():
             os.remove(temp_path)
-        return {"error": "Transcription timed out after 5 minutes"}
+        raise HTTPException(status_code=504, detail="Transcription timed out after 5 minutes")
+    except HTTPException as he:
+        if temp_path.exists():
+            os.remove(temp_path)
+        raise he
     except Exception as e:
         print(f"Error during transcription: {str(e)}")
         # Clean up in case of error
         if temp_path.exists():
             os.remove(temp_path)
-        return {"error": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/")
 async def root():

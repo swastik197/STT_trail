@@ -3,10 +3,12 @@ services:
     name: whisper-backend
     env: python
     buildCommand: |
+      apt-get update && apt-get install -y ffmpeg
+      pip install --upgrade pip
       pip install -r requirements.txt
       npm install
     startCommand: node server.js
     envVars:
       - key: PORT
         value: 5000
-    pythonVersion: "3.9" 
+    pythonVersion: "3.9.18" 

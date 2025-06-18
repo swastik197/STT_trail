@@ -30,7 +30,7 @@ def main():
         
         logger.info("Loading Whisper model...")
         try:
-            model = whisper.load_model("base")
+            model = whisper.load_model("tiny")
             logger.info("Model loaded successfully")
         except Exception as model_error:
             logger.error(f"Failed to load Whisper model: {str(model_error)}")

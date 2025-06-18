@@ -3,6 +3,7 @@ import sys
 import whisper
 import os
 import torch
+import time
 
 def main():
     try:
@@ -15,21 +16,17 @@ def main():
             print(f"Error: Audio file not found: {audio_file}")
             sys.exit(1)
 
-        print(f"Loading Whisper model for {audio_file}...")
-        # Check if CUDA is available
+        # Load model
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        print(f"Using device: {device}")
-        
-        # Use tiny model for faster processing
         model = whisper.load_model("tiny", device=device)
-        print("Model loaded successfully")
         
-        print("Starting transcription...")
-        result = model.transcribe(audio_file)
-        print("Transcription completed")
+        # Load and transcribe the audio
+        audio = whisper.load_audio(audio_file)
+        result = model.transcribe(audio)
         
         if "text" in result:
-            print(result["text"])
+            # Only print the transcription text
+            print(result["text"].strip())
         else:
             print("Error: No transcription text in result")
             sys.exit(1)

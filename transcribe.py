@@ -1,6 +1,7 @@
 # transcribe.py
 import sys
 import whisper
+import time
 
 try:
     if len(sys.argv) != 2:
@@ -9,12 +10,15 @@ try:
 
     audio_file = sys.argv[1]
     print(f"Loading Whisper model for {audio_file}...")
-    model = whisper.load_model("base")
+    # Use tiny model instead of base for faster loading
+    model = whisper.load_model("tiny")
     print("Model loaded successfully")
     
     print("Starting transcription...")
+    start_time = time.time()
     result = model.transcribe(audio_file)
-    print("Transcription completed")
+    end_time = time.time()
+    print(f"Transcription completed in {end_time - start_time:.2f} seconds")
     
     print(result["text"])
 except Exception as e:

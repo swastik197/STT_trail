@@ -5,6 +5,7 @@ import os
 import shutil
 from pathlib import Path
 import sys
+import time
 
 app = FastAPI()
 
@@ -25,6 +26,8 @@ print(f"Upload directory created at: {UPLOAD_DIR.absolute()}")
 @app.post("/transcribe")
 async def transcribe_audio(audio: UploadFile = File(...)):
     print(f"Received request to transcribe: {audio.filename}")
+    start_time = time.time()
+    
     # Save the uploaded file
     temp_path = UPLOAD_DIR / audio.filename
     try:
@@ -32,17 +35,19 @@ async def transcribe_audio(audio: UploadFile = File(...)):
             shutil.copyfileobj(audio.file, buffer)
         print(f"Saved file to: {temp_path}")
         
-        # Run the transcription script
+        # Run the transcription script with timeout
         print("Starting transcription...")
         result = subprocess.run(
             ["python", "transcribe.py", str(temp_path)],
             capture_output=True,
-            text=True
+            text=True,
+            timeout=300  # 5 minute timeout
         )
         
         # Clean up the uploaded file
         os.remove(temp_path)
-        print("Transcription completed")
+        end_time = time.time()
+        print(f"Total processing time: {end_time - start_time:.2f} seconds")
         
         if result.returncode == 0:
             return {"transcription": result.stdout.strip()}
@@ -50,6 +55,11 @@ async def transcribe_audio(audio: UploadFile = File(...)):
             print(f"Transcription failed: {result.stderr}")
             return {"error": result.stderr.strip()}
             
+    except subprocess.TimeoutExpired:
+        print("Transcription timed out after 5 minutes")
+        if temp_path.exists():
+            os.remove(temp_path)
+        return {"error": "Transcription timed out after 5 minutes"}
     except Exception as e:
         print(f"Error during transcription: {str(e)}")
         # Clean up in case of error
@@ -62,6 +72,11 @@ async def root():
     print("Health check endpoint called")
     return {"message": "Whisper API is running"}
 
+@app.get("/test")
+async def test():
+    print("Test endpoint called")
+    return {"status": "ok", "message": "Test endpoint is working"}
+
 if __name__ == "__main__":
     import uvicorn
     try:
@@ -70,7 +85,15 @@ if __name__ == "__main__":
         print(f"Python version: {sys.version}")
         print(f"Current working directory: {os.getcwd()}")
         print(f"Files in current directory: {os.listdir('.')}")
-        uvicorn.run(app, host="0.0.0.0", port=port)
+        # Use a single worker and increase timeout
+        uvicorn.run(
+            app, 
+            host="0.0.0.0", 
+            port=port,
+            workers=1,
+            timeout_keep_alive=300,
+            log_level="debug"
+        )
     except Exception as e:
         print(f"Failed to start server: {str(e)}")
         sys.exit(1) 

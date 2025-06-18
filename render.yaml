@@ -9,12 +9,20 @@ services:
       ffmpeg -version
       echo "Installing Python dependencies..."
       pip install --upgrade pip setuptools wheel
-      pip install -r requirements.txt
+      pip install -r requirements.txt --no-cache-dir
     startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT --workers 1 --timeout-keep-alive 300 --log-level debug
     envVars:
       - key: PORT
         value: 5000
+      - key: PYTHONUNBUFFERED
+        value: "1"
     pythonVersion: "3.11"
     plan: standard
     healthCheckPath: /test
-    autoDeploy: true 
+    autoDeploy: true
+    scaling:
+      minInstances: 1
+      maxInstances: 1
+    resources:
+      cpu: 1
+      memory: 2GB 

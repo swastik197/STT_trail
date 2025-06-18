@@ -6,6 +6,15 @@ import shutil
 from pathlib import Path
 import sys
 import time
+import logging
+import traceback
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -24,6 +33,8 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 
 @app.post("/transcribe")
 async def transcribe_audio(audio: UploadFile = File(...)):
+    logger.info(f"Received transcription request for file: {audio.filename}")
+    
     # Save the uploaded file
     temp_path = UPLOAD_DIR / audio.filename
     try:
@@ -36,10 +47,13 @@ async def transcribe_audio(audio: UploadFile = File(...)):
                     raise HTTPException(status_code=400, detail="File too large. Maximum size is 100MB")
                 buffer.write(chunk)
         
+        logger.info(f"File saved successfully. Size: {file_size} bytes")
+        
         # Run the transcription script with timeout
         env = os.environ.copy()
         env["PYTHONUNBUFFERED"] = "1"  # Ensure Python output is not buffered
         
+        logger.info("Starting transcription process...")
         result = subprocess.run(
             ["python", "transcribe.py", str(temp_path)],
             capture_output=True,
@@ -54,13 +68,17 @@ async def transcribe_audio(audio: UploadFile = File(...)):
         if result.returncode == 0:
             transcription = result.stdout.strip()
             if not transcription:
+                logger.error("Transcription returned empty result")
                 raise HTTPException(status_code=500, detail="Transcription returned empty result")
+            logger.info("Transcription completed successfully")
             return {"transcription": transcription}
         else:
             error_msg = result.stderr.strip()
+            logger.error(f"Transcription failed with error: {error_msg}")
             raise HTTPException(status_code=500, detail=f"Transcription failed: {error_msg}")
             
     except subprocess.TimeoutExpired:
+        logger.error("Transcription timed out after 5 minutes")
         if temp_path.exists():
             os.remove(temp_path)
         raise HTTPException(status_code=504, detail="Transcription timed out after 5 minutes")
@@ -69,6 +87,8 @@ async def transcribe_audio(audio: UploadFile = File(...)):
             os.remove(temp_path)
         raise he
     except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         if temp_path.exists():
             os.remove(temp_path)
         raise HTTPException(status_code=500, detail=str(e))
@@ -85,6 +105,7 @@ if __name__ == "__main__":
     import uvicorn
     try:
         port = int(os.getenv("PORT", "5000"))
+        logger.info(f"Starting server on port {port}")
         uvicorn.run(
             app, 
             host="0.0.0.0", 
@@ -94,5 +115,6 @@ if __name__ == "__main__":
             log_level="info"
         )
     except Exception as e:
-        print(f"Failed to start server: {str(e)}")
+        logger.error(f"Failed to start server: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         sys.exit(1) 

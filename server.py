@@ -104,7 +104,7 @@ async def test():
 if __name__ == "__main__":
     import uvicorn
     try:
-        port = int(os.getenv("PORT", "5000"))
+        port = int(os.getenv("PORT", "10000"))
         logger.info(f"Starting server on port {port}")
         uvicorn.run(
             app, 

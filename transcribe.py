@@ -29,11 +29,22 @@ def main():
         logger.info(f"Audio file size: {os.path.getsize(audio_file)} bytes")
         
         logger.info("Loading Whisper model...")
-        model = whisper.load_model("base")
-        logger.info("Model loaded successfully")
+        try:
+            model = whisper.load_model("base")
+            logger.info("Model loaded successfully")
+        except Exception as model_error:
+            logger.error(f"Failed to load Whisper model: {str(model_error)}")
+            logger.error(f"Model error traceback: {traceback.format_exc()}")
+            sys.exit(1)
 
         logger.info(f"Transcribing audio file: {audio_file}")
-        result = model.transcribe(audio_file)
+        try:
+            result = model.transcribe(audio_file)
+            logger.info("Transcription completed")
+        except Exception as transcribe_error:
+            logger.error(f"Failed during transcription: {str(transcribe_error)}")
+            logger.error(f"Transcription error traceback: {traceback.format_exc()}")
+            sys.exit(1)
         
         if not result:
             logger.error("Transcription failed - result is None")

@@ -6,9 +6,11 @@ services:
       apt-get update && apt-get install -y ffmpeg
       pip install --upgrade pip setuptools wheel
       pip install -r requirements.txt
-      npm install
+      npm install --production
     startCommand: node server.js
     envVars:
       - key: PORT
         value: 5000
+      - key: NODE_ENV
+        value: production
     pythonVersion: "3.11" 
